@@ -71,12 +71,10 @@ function calculateBonusByProfit(index, total, seller) {
  * Возвращает итоговый отчёт в понятном формате.
  */
 function analyzeSalesData(data, options) {
-  // 1. Базовая проверка: вообще объект?
   if (!data || typeof data !== 'object') {
     throw new Error('Ожидается объект с данными');
   }
 
-  // 2. Проверяем, что поля существуют И что они не пустые массивы
   if (!Array.isArray(data.purchase_records) || data.purchase_records.length === 0) {
     throw new Error('В данных отсутствует или пуст purchase_records');
   }
@@ -87,7 +85,6 @@ function analyzeSalesData(data, options) {
     throw new Error('В данных отсутствуют или пусты products');
   }
 
-  // 3. Проверка опций
   const { calculateRevenue, calculateBonus } = options;
   if (typeof calculateRevenue !== 'function') {
     throw new Error('Требуется функция calculateRevenue');
@@ -110,7 +107,7 @@ function analyzeSalesData(data, options) {
       sellersMap[sellerId] = {
         seller_id: sellerId,
         name: sellerInfo
-          ? `${sellerInfo.first_name} ${sellerInfo.last_name}`
+          ? `${sellerInfo.first_name.trim()} ${sellerInfo.last_name.trim()}`
           : `Продавец ${sellerId}`,
         revenue: 0,
         profit: 0,
@@ -127,11 +124,11 @@ function analyzeSalesData(data, options) {
       const product = productIndex[sku];
       if (!product) return;
 
+      // Точный расчёт без округления
       const revenue = calculateRevenue(item, product);
       const cost = (product.purchase_price ?? 0) * (item.quantity ?? 0);
       const profitLine = revenue - cost;
 
-      // Не округляем внутри цикла — копим точные числа
       stats.revenue += revenue;
       stats.profit += profitLine;
 
@@ -156,6 +153,7 @@ function analyzeSalesData(data, options) {
     seller.top_products = productsArray.slice(0, 10);
   });
 
+  // ОКРУГЛЯЕМ ТОЛЬКО ЗДЕСЬ, в самом конце
   return resultList.map(seller => ({
     seller_id: seller.seller_id,
     name: seller.name,
@@ -166,6 +164,7 @@ function analyzeSalesData(data, options) {
     bonus: roundMoney(seller.bonus)
   }));
 }
+
 
 /**
  * Вспомогательная функция для аккуратного округления денег до 2 знаков.
