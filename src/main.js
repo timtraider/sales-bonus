@@ -71,20 +71,23 @@ function calculateBonusByProfit(index, total, seller) {
  * Возвращает итоговый отчёт в понятном формате.
  */
 function analyzeSalesData(data, options) {
-  // Жёсткие проверки: если чего‑то нет — сразу ошибка, как хотят тесты
+  // 1. Базовая проверка: вообще объект?
   if (!data || typeof data !== 'object') {
     throw new Error('Ожидается объект с данными');
   }
-  if (!Array.isArray(data.purchase_records)) {
-    throw new Error('В данных отсутствует purchase_records');
+
+  // 2. Проверяем, что поля существуют И что они не пустые массивы
+  if (!Array.isArray(data.purchase_records) || data.purchase_records.length === 0) {
+    throw new Error('В данных отсутствует или пуст purchase_records');
   }
-  if (!Array.isArray(data.sellers)) {
-    throw new Error('В данных отсутствует sellers');
+  if (!Array.isArray(data.sellers) || data.sellers.length === 0) {
+    throw new Error('В данных отсутствуют или пусты sellers');
   }
-  if (!Array.isArray(data.products)) {
-    throw new Error('В данных отсутствует products');
+  if (!Array.isArray(data.products) || data.products.length === 0) {
+    throw new Error('В данных отсутствуют или пусты products');
   }
 
+  // 3. Проверка опций
   const { calculateRevenue, calculateBonus } = options;
   if (typeof calculateRevenue !== 'function') {
     throw new Error('Требуется функция calculateRevenue');
@@ -93,7 +96,6 @@ function analyzeSalesData(data, options) {
     throw new Error('Требуется функция calculateBonus');
   }
 
-  // Строим быстрые справочники
   const productIndex = buildProductIndex(data.products);
   const sellerIndex = buildSellerIndex(data.sellers);
 
@@ -125,13 +127,11 @@ function analyzeSalesData(data, options) {
       const product = productIndex[sku];
       if (!product) return;
 
-      // Считаем выручку по строке чека
       const revenue = calculateRevenue(item, product);
-      // Себестоимость: закупочная цена × количество
       const cost = (product.purchase_price ?? 0) * (item.quantity ?? 0);
       const profitLine = revenue - cost;
 
-      // ВАЖНО: не округляем здесь. Копим точные числа, чтобы копейки сошлись с тестами
+      // Не округляем внутри цикла — копим точные числа
       stats.revenue += revenue;
       stats.profit += profitLine;
 
@@ -143,15 +143,12 @@ function analyzeSalesData(data, options) {
   });
 
   const resultList = Object.values(sellersMap);
-
-  // Сортируем по прибыли (убывание)
   resultList.sort((a, b) => b.profit - a.profit);
 
   const totalSellers = resultList.length;
   resultList.forEach((seller, index) => {
     seller.bonus = calculateBonus(index, totalSellers, seller);
 
-    // Топ‑10 товаров
     const productsArray = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => b.quantity - a.quantity);
@@ -159,7 +156,6 @@ function analyzeSalesData(data, options) {
     seller.top_products = productsArray.slice(0, 10);
   });
 
-  // Округляем только в самом конце, чтобы совпадали копейки с эталоном
   return resultList.map(seller => ({
     seller_id: seller.seller_id,
     name: seller.name,
