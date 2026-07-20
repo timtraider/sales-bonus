@@ -75,13 +75,18 @@ function analyzeSalesData(data, options) {
     throw new Error('Ожидается объект с данными');
   }
 
-  if (!Array.isArray(data.purchase_records) || data.purchase_records.length === 0) {
+  // Безопасная проверка purchase_records
+  if (!data.purchase_records || !Array.isArray(data.purchase_records) || data.purchase_records.length === 0) {
     throw new Error('В данных отсутствует или пуст purchase_records');
   }
-  if (!Array.isArray(data.sellers) || data.sellers.length === 0) {
+
+  // Безопасная проверка sellers
+  if (!data.sellers || !Array.isArray(data.sellers) || data.sellers.length === 0) {
     throw new Error('В данных отсутствуют или пусты sellers');
   }
-  if (!Array.isArray(data.products) || data.products.length === 0) {
+
+  // Безопасная проверка products — вот тут была проблема
+  if (!data.products || !Array.isArray(data.products) || data.products.length === 0) {
     throw new Error('В данных отсутствуют или пусты products');
   }
 
