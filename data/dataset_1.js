@@ -6699,3 +6699,44 @@ const data = {
         }
     ]
 }
+
+// const data = {
+//     "customers": [
+//         {
+//             "id": "customer_1",
+//             "first_name": "Andrey",
+//             "last_name": "Alekseev",
+//             "phone": "+79296758019",
+//             "workplace": "SteelWorks",
+//             "position": "Worker"
+//         }],
+//         "products": [
+//         {
+//             "name": "Cement #100",
+//             "category": "Paints",
+//             "sku": "SKU_001",
+//             "purchase_price": 460.34,
+//             "sale_price": 699.99
+//         }],
+//         "sellers": [
+//         {
+//             "id": "seller_1",
+//             "first_name": "Alexey",
+//             "last_name": "Petrov",
+//             "start_date": "2024-07-17",
+//             "position": "Senior Seller"
+//         }],
+//         "purchase_records": [
+//         {
+//             "receipt_id": "receipt_1",
+//             "date": "2023-12-04",
+//             "seller_id": "seller_5",
+//             "customer_id": "customer_1",
+//             "items": [
+//                 {
+//                     "sku": "SKU_027",
+//                     "discount": 7.68,
+//                     "quantity": 1,
+//                     "sale_price": 919.07
+//         }]}
+//               ]}
