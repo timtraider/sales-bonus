@@ -48,7 +48,7 @@ function calculateSimpleRevenue(item, _product) {
  * - Остальные: 5%
  */
 function calculateBonusByProfit(index, total, seller) {
-  if (total <= 1) return 0; // если продавец один — бонусов нет
+  if (total <= 1) return 0;
 
   let percent = 0;
 
@@ -135,7 +135,6 @@ function analyzeSalesData(data, options) {
       const product = productIndex[sku];
       if (!product) return;
 
-      // Точный расчёт без округления
       const revenue = calculateRevenue(item, product);
       const cost = (product.purchase_price ?? 0) * (item.quantity ?? 0);
       const profitLine = revenue - cost;
@@ -152,7 +151,7 @@ function analyzeSalesData(data, options) {
 
   const resultList = Object.values(sellersMap);
 
-  // НАДЁЖНАЯ стабильная сортировка: сначала по прибыли, потом по seller_id
+  // Стабильная сортировка продавцов: по прибыли, потом по seller_id
   resultList.sort((a, b) => {
     const diff = b.profit - a.profit;
     if (Math.abs(diff) > 0.001) {
@@ -163,10 +162,11 @@ function analyzeSalesData(data, options) {
 
   const totalSellers = resultList.length;
   resultList.forEach((seller, index) => {
-    // Бонус считаем от округлённой прибыли — так совпадает с эталоном
+    // Бонус считаем от округлённой прибыли
     const roundedProfit = roundMoney(seller.profit);
     seller.bonus = calculateBonus(index, totalSellers, { ...seller, profit: roundedProfit });
 
+    // Стабильная сортировка топ‑товаров: по количеству, потом по sku
     const productsArray = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
@@ -179,7 +179,7 @@ function analyzeSalesData(data, options) {
     seller.top_products = productsArray.slice(0, 10);
   });
 
-  // ОКРУГЛЯЕМ ТОЛЬКО ЗДЕСЬ, в самом конце
+  // Округляем только в самом конце
   return resultList.map(seller => ({
     seller_id: seller.seller_id,
     name: seller.name,
