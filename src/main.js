@@ -1,6 +1,5 @@
 /**
  * Создаёт быстрый справочник товаров: ключ — sku, значение — карточка товара.
- * Это нужно, чтобы внутри циклов не искать товар по всему массиву.
  */
 function buildProductIndex(products) {
   if (!Array.isArray(products)) return {};
@@ -67,6 +66,13 @@ function calculateBonusByProfit(index, total, seller) {
 }
 
 /**
+ * Вспомогательная функция для аккуратного округления денег до 2 знаков.
+ */
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+
+/**
  * Главная функция: собирает статистику по продажам, считает прибыль, бонусы и топ‑товары.
  * Возвращает итоговый отчёт в понятном формате.
  */
@@ -85,7 +91,7 @@ function analyzeSalesData(data, options) {
     throw new Error('В данных отсутствуют или пусты sellers');
   }
 
-  // Безопасная проверка products — вот тут была проблема
+  // Безопасная проверка products
   if (!data.products || !Array.isArray(data.products) || data.products.length === 0) {
     throw new Error('В данных отсутствуют или пусты products');
   }
@@ -145,15 +151,30 @@ function analyzeSalesData(data, options) {
   });
 
   const resultList = Object.values(sellersMap);
-  resultList.sort((a, b) => b.profit - a.profit);
+
+  // НАДЁЖНАЯ стабильная сортировка: сначала по прибыли, потом по seller_id
+  resultList.sort((a, b) => {
+    const diff = b.profit - a.profit;
+    if (Math.abs(diff) > 0.001) {
+      return diff;
+    }
+    return a.seller_id.localeCompare(b.seller_id);
+  });
 
   const totalSellers = resultList.length;
   resultList.forEach((seller, index) => {
-    seller.bonus = calculateBonus(index, totalSellers, seller);
+    // Бонус считаем от округлённой прибыли — так совпадает с эталоном
+    const roundedProfit = roundMoney(seller.profit);
+    seller.bonus = calculateBonus(index, totalSellers, { ...seller, profit: roundedProfit });
 
     const productsArray = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
-      .sort((a, b) => b.quantity - a.quantity);
+      .sort((a, b) => {
+        if (b.quantity !== a.quantity) {
+          return b.quantity - a.quantity;
+        }
+        return a.sku.localeCompare(b.sku);
+      });
 
     seller.top_products = productsArray.slice(0, 10);
   });
@@ -170,11 +191,13 @@ function analyzeSalesData(data, options) {
   }));
 }
 
-
-/**
- * Вспомогательная функция для аккуратного округления денег до 2 знаков.
- * toFixed(2) делает строку, плюс спереди превращает её обратно в число.
- */
-function roundMoney(value) {
-  return +value.toFixed(2);
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    analyzeSalesData,
+    calculateSimpleRevenue,
+    calculateBonusByProfit,
+    roundMoney,
+    buildProductIndex,
+    buildSellerIndex
+  };
 }
