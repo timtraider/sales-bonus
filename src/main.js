@@ -71,12 +71,18 @@ function calculateBonusByProfit(index, total, seller) {
  * Возвращает итоговый отчёт в понятном формате.
  */
 function analyzeSalesData(data, options) {
-  // --- Защита от неверных входных данных ---
+  // Жёсткие проверки: если чего‑то нет — сразу ошибка, как хотят тесты
   if (!data || typeof data !== 'object') {
     throw new Error('Ожидается объект с данными');
   }
   if (!Array.isArray(data.purchase_records)) {
     throw new Error('В данных отсутствует purchase_records');
+  }
+  if (!Array.isArray(data.sellers)) {
+    throw new Error('В данных отсутствует sellers');
+  }
+  if (!Array.isArray(data.products)) {
+    throw new Error('В данных отсутствует products');
   }
 
   const { calculateRevenue, calculateBonus } = options;
@@ -87,21 +93,17 @@ function analyzeSalesData(data, options) {
     throw new Error('Требуется функция calculateBonus');
   }
 
-  // --- Шаг 1: строим быстрые справочники (индексы) ---
-  const productIndex = buildProductIndex(data.products || []);
-  const sellerIndex = buildSellerIndex(data.sellers || []);
+  // Строим быстрые справочники
+  const productIndex = buildProductIndex(data.products);
+  const sellerIndex = buildSellerIndex(data.sellers);
 
-  // Хранилище статистики: ключ — seller_id, значение — объект со счётчиками
   const sellersMap = {};
 
-  // --- Шаг 2: двойной цикл — проходим по всем чекам и всем товарам в них ---
   data.purchase_records.forEach(record => {
     const sellerId = record.seller_id;
-    if (!sellerId) return; // пропускаем чеки без продавца
+    if (!sellerId) return;
 
     const sellerInfo = sellerIndex[sellerId];
-
-    // Если продавца ещё нет в статистике — создаём запись
     if (!sellersMap[sellerId]) {
       sellersMap[sellerId] = {
         seller_id: sellerId,
@@ -111,32 +113,28 @@ function analyzeSalesData(data, options) {
         revenue: 0,
         profit: 0,
         sales_count: 0,
-        products_sold: {} // { sku: количество проданных штук }
+        products_sold: {}
       };
     }
 
     const stats = sellersMap[sellerId];
-    stats.sales_count += 1; // один чек = одна продажа
+    stats.sales_count += 1;
 
     record.items.forEach(item => {
       const sku = item.sku;
       const product = productIndex[sku];
+      if (!product) return;
 
-      if (!product) return; // если товара нет в каталоге — пропускаем
-
-      // Выручка по строке чека (с учётом скидки)
+      // Считаем выручку по строке чека
       const revenue = calculateRevenue(item, product);
-
       // Себестоимость: закупочная цена × количество
       const cost = (product.purchase_price ?? 0) * (item.quantity ?? 0);
-
-      // Прибыль по строке: выручка минус себестоимость
       const profitLine = revenue - cost;
 
+      // ВАЖНО: не округляем здесь. Копим точные числа, чтобы копейки сошлись с тестами
       stats.revenue += revenue;
       stats.profit += profitLine;
 
-      // Учёт количества проданных товаров по каждому артикулу
       if (!stats.products_sold[sku]) {
         stats.products_sold[sku] = 0;
       }
@@ -144,33 +142,30 @@ function analyzeSalesData(data, options) {
     });
   });
 
-  // Превращаем словарь статистики в массив для удобной сортировки и маппинга
   const resultList = Object.values(sellersMap);
 
-  // --- Шаг 3: сортируем продавцов по прибыли (убывание) ---
+  // Сортируем по прибыли (убывание)
   resultList.sort((a, b) => b.profit - a.profit);
 
-  // --- Шаг 4: считаем бонусы и формируем топ‑10 товаров для каждого продавца ---
   const totalSellers = resultList.length;
-
   resultList.forEach((seller, index) => {
     seller.bonus = calculateBonus(index, totalSellers, seller);
 
-    // Превращаем объект { sku: qty } в массив объектов [{ sku, quantity }]
+    // Топ‑10 товаров
     const productsArray = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
-      .sort((a, b) => b.quantity - a.quantity); // сортируем по убыванию количества
+      .sort((a, b) => b.quantity - a.quantity);
 
-    seller.top_products = productsArray.slice(0, 10); // берём топ‑10
+    seller.top_products = productsArray.slice(0, 10);
   });
 
-  // --- Шаг 5: формируем итоговый отчёт с аккуратными числами ---
+  // Округляем только в самом конце, чтобы совпадали копейки с эталоном
   return resultList.map(seller => ({
     seller_id: seller.seller_id,
     name: seller.name,
     revenue: roundMoney(seller.revenue),
     profit: roundMoney(seller.profit),
-    sales_count: seller.sales_count, // оставляем целым
+    sales_count: seller.sales_count,
     top_products: seller.top_products,
     bonus: roundMoney(seller.bonus)
   }));
