@@ -101,13 +101,9 @@ function analyzeSalesData(data, options) {
 
   data.purchase_records.forEach(record => {
     const sellerId = record.seller_id;
-
-    if (!sellerId) {
-      return;
-    }
+    if (!sellerId) return;
 
     const sellerInfo = sellerIndex[sellerId];
-
     if (!sellersMap[sellerId]) {
       sellersMap[sellerId] = {
         seller_id: sellerId,
@@ -125,37 +121,33 @@ function analyzeSalesData(data, options) {
     stats.sales_count += 1;
 
     record.items.forEach(item => {
-      const sku = String(item.sku).trim().toLowerCase();
-      const product = productIndex[sku];
-
-      if (!product) {
-        return;
-      }
+      const rawSku = String(item.sku).trim();
+      const key = rawSku.toLowerCase();
+      const product = productIndex[key];
+      if (!product) return;
 
       const revenueRaw = calculateRevenue(item, product);
+      if (typeof revenueRaw !== 'number' || Number.isNaN(revenueRaw)) return;
 
-      if (typeof revenueRaw !== 'number' || Number.isNaN(revenueRaw)) {
-        return;
-      }
-
-      // Выручка: округляем по позиции → суммируем
+      // Выручка: округляем по позиции, суммируем
       const revenue = roundMoney(revenueRaw);
       stats.revenue += revenue;
 
-      // Прибыль: считаем по «сырой» выручке → суммируем без округления → округляем в конце
+      // Прибыль: по «сырой» выручке, суммируем без округления
       const cost = (Number(product.purchase_price) || 0) * (item.quantity ?? 0);
       const profitLineRaw = revenueRaw - cost;
       stats.profit += profitLineRaw;
 
-      if (!stats.products_sold[sku]) {
-        stats.products_sold[sku] = 0;
+      // В статистику кладём оригинальный SKU (с правильным регистром)
+      const displaySku = product.sku;
+      if (!stats.products_sold[displaySku]) {
+        stats.products_sold[displaySku] = 0;
       }
-      stats.products_sold[sku] += (item.quantity ?? 0);
+      stats.products_sold[displaySku] += (item.quantity ?? 0);
     });
   });
 
   const resultList = Object.values(sellersMap);
-
   resultList.sort((a, b) => b.profit - a.profit);
 
   const totalSellers = resultList.length;
@@ -163,6 +155,7 @@ function analyzeSalesData(data, options) {
     const roundedProfit = roundMoney(seller.profit);
     seller.bonus = calculateBonus(index, totalSellers, { ...seller, profit: roundedProfit });
 
+    // Сортировка топ‑товаров: сначала по количеству, потом по SKU (лексикографически)
     const productsArray = Object.entries(seller.products_sold)
       .map(([sku, quantity]) => ({ sku, quantity }))
       .sort((a, b) => {
@@ -185,6 +178,7 @@ function analyzeSalesData(data, options) {
     bonus: roundMoney(seller.bonus)
   }));
 }
+
 
 
 
