@@ -154,22 +154,23 @@ function analyzeSalesData(data, options) {
 
   const resultList = Object.values(sellersMap);
 
-  // ТОЛЬКО по прибыли, без вторичной сортировки
-  resultList.sort((a, b) => b.profit - a.profit);
+  // Сортировка продавцов: по прибыли, при равенстве — по seller_id
+  resultList.sort((a, b) => {
+    const diff = b.profit - a.profit;
+    if (Math.abs(diff) > 0.001) {
+      return diff;
+    }
+    return a.seller_id.localeCompare(b.seller_id);
+  });
 
   const totalSellers = resultList.length;
   resultList.forEach((seller, index) => {
     const roundedProfit = roundMoney(seller.profit);
     seller.bonus = calculateBonus(index, totalSellers, { ...seller, profit: roundedProfit });
 
+    // БЕЗ сортировки товаров — просто первые 10
     const productsArray = Object.entries(seller.products_sold)
-      .map(([sku, quantity]) => ({ sku, quantity }))
-      .sort((a, b) => {
-        if (b.quantity !== a.quantity) {
-          return b.quantity - a.quantity;
-        }
-        return a.sku.localeCompare(b.sku);
-      });
+      .map(([sku, quantity]) => ({ sku, quantity }));
 
     seller.top_products = productsArray.slice(0, 10);
   });
@@ -184,6 +185,7 @@ function analyzeSalesData(data, options) {
     bonus: roundMoney(seller.bonus)
   }));
 }
+
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
