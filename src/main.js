@@ -9,7 +9,7 @@ function buildProductIndex(products) {
       .filter(p => p && p.sku)
       .map(product => {
         const key = String(product.sku).trim().toLowerCase();
-        return [key, product]; // <-- в значение кладём весь объект product
+        return [key, product];
       })
   );
 }
@@ -155,17 +155,21 @@ function analyzeSalesData(data, options) {
     const roundedProfit = roundMoney(seller.profit);
     seller.bonus = calculateBonus(index, totalSellers, { ...seller, profit: roundedProfit });
 
-    // Самое важное: берём ключи как есть, без .toLowerCase()
+    // Формируем массив товаров: берём ключи из products_sold ровно как они есть
     const productsArray = Object.keys(seller.products_sold).map(sku => ({
       sku,
       quantity: seller.products_sold[sku]
     }));
 
+    // Сортировка: сначала по количеству (убывание), потом по SKU (строго по кодам)
     productsArray.sort((a, b) => {
       if (b.quantity !== a.quantity) {
         return b.quantity - a.quantity;
       }
-      return a.sku.localeCompare(b.sku);
+      // Бинарное сравнение строк: гарантирует одинаковый порядок везде
+      if (a.sku < b.sku) return -1;
+      if (a.sku > b.sku) return 1;
+      return 0;
     });
 
     seller.top_products = productsArray.slice(0, 10);
@@ -181,8 +185,3 @@ function analyzeSalesData(data, options) {
     bonus: roundMoney(seller.bonus)
   }));
 }
-
-
-
-
-
