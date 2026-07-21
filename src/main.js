@@ -125,46 +125,37 @@ function analyzeSalesData(data, options) {
     stats.sales_count += 1;
 
     record.items.forEach(item => {
-  const sku = String(item.sku).trim().toLowerCase();
-  const product = productIndex[sku];
+      const sku = String(item.sku).trim().toLowerCase();
+      const product = productIndex[sku];
 
-  if (!product) {
-    return;
-  }
+      if (!product) {
+        return;
+      }
 
-  // Передаём в calculateRevenue ровно то, что в чеке — без подмены sale_price
-  const revenueRaw = calculateRevenue(item, product);
+      const revenueRaw = calculateRevenue(item, product);
 
-  if (typeof revenueRaw !== 'number' || Number.isNaN(revenueRaw)) {
-    return;
-  }
+      if (typeof revenueRaw !== 'number' || Number.isNaN(revenueRaw)) {
+        return;
+      }
 
-  // ВАЖНО: округляем выручку по позиции ДО суммирования
-  const revenue = roundMoney(revenueRaw);
+      const revenue = roundMoney(revenueRaw);
+      const cost = (Number(product.purchase_price) || 0) * (item.quantity ?? 0);
+      const profitLine = roundMoney(revenue - cost);
 
-  const cost = (Number(product.purchase_price) || 0) * (item.quantity ?? 0);
-  // Прибыль тоже лучше округлить сразу по позиции, чтобы не накапливалась погрешность
-  const profitLine = roundMoney(revenue - cost);
+      stats.revenue += revenue;
+      stats.profit += profitLine;
 
-  stats.revenue += revenue;
-  stats.profit += profitLine;
-
-  if (!stats.products_sold[sku]) {
-    stats.products_sold[sku] = 0;
-  }
-  stats.products_sold[sku] += (item.quantity ?? 0);
-});
+      if (!stats.products_sold[sku]) {
+        stats.products_sold[sku] = 0;
+      }
+      stats.products_sold[sku] += (item.quantity ?? 0);
+    });
   });
 
   const resultList = Object.values(sellersMap);
 
-  resultList.sort((a, b) => {
-    const diff = b.profit - a.profit;
-    if (Math.abs(diff) > 0.001) {
-      return diff;
-    }
-    return a.seller_id.localeCompare(b.seller_id);
-  });
+  // ТОЛЬКО по прибыли, без вторичной сортировки
+  resultList.sort((a, b) => b.profit - a.profit);
 
   const totalSellers = resultList.length;
   resultList.forEach((seller, index) => {
@@ -193,7 +184,6 @@ function analyzeSalesData(data, options) {
     bonus: roundMoney(seller.bonus)
   }));
 }
-
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
