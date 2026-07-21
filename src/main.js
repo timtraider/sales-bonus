@@ -9,7 +9,7 @@ function buildProductIndex(products) {
       .filter(p => p && p.sku)
       .map(product => {
         const key = String(product.sku).trim().toLowerCase();
-        return [key, product];
+        return [key, product]; // <-- в значение кладём весь объект product
       })
   );
 }
@@ -129,16 +129,16 @@ function analyzeSalesData(data, options) {
       const revenueRaw = calculateRevenue(item, product);
       if (typeof revenueRaw !== 'number' || Number.isNaN(revenueRaw)) return;
 
-      // Выручка: округляем по позиции, суммируем
+      // Выручка: округляем по позиции → суммируем
       const revenue = roundMoney(revenueRaw);
       stats.revenue += revenue;
 
-      // Прибыль: по «сырой» выручке, суммируем без округления
+      // Прибыль: по «сырой» выручке → суммируем без округления
       const cost = (Number(product.purchase_price) || 0) * (item.quantity ?? 0);
       const profitLineRaw = revenueRaw - cost;
       stats.profit += profitLineRaw;
 
-      // В статистику кладём оригинальный SKU (с правильным регистром)
+      // В статистику кладём оригинальный SKU из карточки товара
       const displaySku = product.sku;
       if (!stats.products_sold[displaySku]) {
         stats.products_sold[displaySku] = 0;
@@ -155,15 +155,18 @@ function analyzeSalesData(data, options) {
     const roundedProfit = roundMoney(seller.profit);
     seller.bonus = calculateBonus(index, totalSellers, { ...seller, profit: roundedProfit });
 
-    // Сортировка топ‑товаров: сначала по количеству, потом по SKU (лексикографически)
-    const productsArray = Object.entries(seller.products_sold)
-      .map(([sku, quantity]) => ({ sku, quantity }))
-      .sort((a, b) => {
-        if (b.quantity !== a.quantity) {
-          return b.quantity - a.quantity;
-        }
-        return a.sku.localeCompare(b.sku);
-      });
+    // Самое важное: берём ключи как есть, без .toLowerCase()
+    const productsArray = Object.keys(seller.products_sold).map(sku => ({
+      sku,
+      quantity: seller.products_sold[sku]
+    }));
+
+    productsArray.sort((a, b) => {
+      if (b.quantity !== a.quantity) {
+        return b.quantity - a.quantity;
+      }
+      return a.sku.localeCompare(b.sku);
+    });
 
     seller.top_products = productsArray.slice(0, 10);
   });
@@ -178,6 +181,7 @@ function analyzeSalesData(data, options) {
     bonus: roundMoney(seller.bonus)
   }));
 }
+
 
 
 
