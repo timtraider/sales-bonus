@@ -138,12 +138,14 @@ function analyzeSalesData(data, options) {
         return;
       }
 
+      // Выручка: округляем по позиции → суммируем
       const revenue = roundMoney(revenueRaw);
-      const cost = (Number(product.purchase_price) || 0) * (item.quantity ?? 0);
-      const profitLine = roundMoney(revenue - cost);
-
       stats.revenue += revenue;
-      stats.profit += profitLine;
+
+      // Прибыль: считаем по «сырой» выручке → суммируем без округления → округляем в конце
+      const cost = (Number(product.purchase_price) || 0) * (item.quantity ?? 0);
+      const profitLineRaw = revenueRaw - cost;
+      stats.profit += profitLineRaw;
 
       if (!stats.products_sold[sku]) {
         stats.products_sold[sku] = 0;
@@ -154,23 +156,21 @@ function analyzeSalesData(data, options) {
 
   const resultList = Object.values(sellersMap);
 
-  // Сортировка продавцов: по прибыли, при равенстве — по seller_id
-  resultList.sort((a, b) => {
-    const diff = b.profit - a.profit;
-    if (Math.abs(diff) > 0.001) {
-      return diff;
-    }
-    return a.seller_id.localeCompare(b.seller_id);
-  });
+  resultList.sort((a, b) => b.profit - a.profit);
 
   const totalSellers = resultList.length;
   resultList.forEach((seller, index) => {
     const roundedProfit = roundMoney(seller.profit);
     seller.bonus = calculateBonus(index, totalSellers, { ...seller, profit: roundedProfit });
 
-    // БЕЗ сортировки товаров — просто первые 10
     const productsArray = Object.entries(seller.products_sold)
-      .map(([sku, quantity]) => ({ sku, quantity }));
+      .map(([sku, quantity]) => ({ sku, quantity }))
+      .sort((a, b) => {
+        if (b.quantity !== a.quantity) {
+          return b.quantity - a.quantity;
+        }
+        return a.sku.localeCompare(b.sku);
+      });
 
     seller.top_products = productsArray.slice(0, 10);
   });
@@ -187,13 +187,4 @@ function analyzeSalesData(data, options) {
 }
 
 
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    analyzeSalesData,
-    calculateSimpleRevenue,
-    calculateBonusByProfit,
-    roundMoney,
-    buildProductIndex,
-    buildSellerIndex
-  };
-}
+
